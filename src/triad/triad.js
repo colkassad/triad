@@ -20,7 +20,7 @@ Triad.prototype.convexHull = function(pointFeatureCollection) {
 		return { type: "FeatureCollection", features: points };
 	}
 	points.sort(function(a, b) {
-		return q.geometry.coordinates[0] == r.geometry.coordinates[0] ? a.geometry.coordinates[1] - b.geometry.coordinates[1] : a.geometry.coordinates[0] - b.geometry.coordinates[0];
+		return a.geometry.coordinates[0] == b.geometry.coordinates[0] ? a.geometry.coordinates[1] - b.geometry.coordinates[1] : a.geometry.coordinates[0] - b.geometry.coordinates[0];
 		});
 
 	var lower = [];
