@@ -60,7 +60,7 @@ Triad.prototype.getConvexHull = function(pointFeatureCollection) {
  */
 Triad.prototype.getLineString  = function(pointFeatureCollection) {
 	var self = this;
-	var coords = pointFeatureCollection.features.map(function(feature) {
+	var lineCoords = pointFeatureCollection.features.map(function(feature) {
 		return feature.geometry.coordinates;
 	});
 	var lineString = JSON.stringify({type: "Feature", geometry: lineCoords, properties: {}});
@@ -71,6 +71,74 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * Constructs a GeoJSON Polygon Feature from a GeoJSON FeatureCollection of points.
  * 
  */
+ Triad.prototype.getPolygon = function(pointFeatureCollection) {
+
+ };
+
+ Triad.prototype.inside = function(pointFeature, polygonFeature) {
+
+ };
+
+ Triad.prototype.getEnvelope = function(feature) {
+ 	
+ 	var minx = Number.MAX_VALUE;
+ 	var miny = Number.MAX_VALUE;
+ 	var maxx = Number.MIN_VALUE;
+ 	var maxy = Number.MIN_VALUE;
+
+ 	var bbox = [minx, miny, maxx, maxy];
+
+ 	if (feature.geometry.type === "Point") {
+ 		return feature;
+ 	} else if (feature.geometry.type === "MultiPoint" || feature.geometry.type === "LineString") {
+ 		bbox = this.expandBBox(feature.geometry.coordinates, bbox);
+ 	} else if (feature.geometry.type === "MuliLineString" || feature.geometry.type === "Polygon") {
+ 		for (var i = 0; i < feature.geometry.coordinates.length; i++) {
+ 			bbox = this.expandBBox(feature.geometry.coordinates[i], bbox);
+ 		}
+ 	} else if (feature.geometry.type === "MultiPolygon") {
+ 		for (var i = 0; i < feature.geometry.coordinates.length; i++) {
+ 			for (var j = 0; j < feature.geometry.coordinates[i].length; j++) {
+ 				bbox = this.expandBBox(feature.geometry.coordinates[i][j], bbox);
+ 			}
+ 		}
+ 	}
+
+ 	return { 
+		type: "Feature", 
+		geometry: {
+			type: "Polygon", 
+			coordinates: [
+				[
+ 					[bbox[0], bbox[1]], 
+ 					[bbox[0], bbox[3]], 
+ 					[bbox[2], bbox[3]], 
+ 					[bbox[2], bbox[1]], 
+ 					[bbox[0], bbox[1]]
+				]
+			]
+		}, 
+		properties: {}
+	};
+ };
+
+ Triad.prototype.expandBBox = function(coords, origBBox) {
+ 	for (var i = 0; i < coords.length; i++) {
+ 		if (coords[i][0] < origBBox[0]) {
+ 			origBBox[0] = coords[i][0];
+ 		}
+ 		if (coords[i][0] > origBBox[2]) {
+ 			origBBox[2] = coords[i][0];
+ 		}
+ 		if (coords[i][1] < origBBox[1]) {
+ 			origBBox[1] = coords[i][1];
+ 		}
+ 		if (coords[i][1] > origBBox[3]) {
+ 			origBBox[3] = coords[i][1];
+ 		}
+ 	}
+ 	return origBBox;
+ };
 
 /*
  * Returns the cross product of three points, used to determine if r 

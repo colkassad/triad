@@ -8,6 +8,15 @@ QUnit.module("Triad", {
 		this.gjsPoint1 = {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}};
 		this.gjsPoint2 = {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[0,7.2]}};
 
+		this.polygonWithHoles = {type: "Feature", geometry: { 
+									"type": "Polygon",
+    								"coordinates": 
+    								[
+										[ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ],
+										[ [100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2] ]
+									]
+   								}, properties: {}};
+
 		this.gjsPoints = { 
 			type: "FeatureCollection", 
 			features: [
@@ -99,10 +108,18 @@ QUnit.module("Triad", {
 * Assert that clipping produces correct GeoJSON geometry
 **/
 QUnit.test("Convex Hulls", function(assert) {
-	expect(4);
+	expect(3);
 	var hull = this.triad.getConvexHull(this.gjsPoints);
 	assert.equal(hull.type, "Feature", "The convex hull returned is a GeoJSON Feature.");
-	assert.equal(hull.geometry.type, "Polygon", "The convex hull returned is of geoemetry type Polygon.");
+	assert.equal(hull.geometry.type, "Polygon", "The convex hull returned is of geometry type Polygon.");
 	assert.equal(hull.geometry.coordinates[0][0].length - 1, 3, "The convex hull returned has the expected number of vertices.");
 });
 
+QUnit.test("Envelopes", function(assert) {
+	expect(4);
+	var env = this.triad.getEnvelope(this.polygonWithHoles);
+	assert.equal(env.geometry.coordinates[0][0][0], 100.0, "Envelope minimum X is correct.");
+	assert.equal(env.geometry.coordinates[0][0][1], 0.0, "Envelope minimum Y is correct.");
+	assert.equal(env.geometry.coordinates[0][2][0], 101.0, "Envelope maximum X is correct.");
+	assert.equal(env.geometry.coordinates[0][2][1], 1.0, "Envelope maximum Y is correct.");
+});
