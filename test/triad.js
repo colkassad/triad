@@ -79,7 +79,7 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  };
 
- Triad.prototype.getEnvelope = function(feature) {
+ Triad.prototype.getEnvelope = function(geoJSON) {
  	
  	var minx = Number.MAX_VALUE;
  	var miny = Number.MAX_VALUE;
@@ -88,20 +88,30 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	var bbox = [minx, miny, maxx, maxy];
 
- 	if (feature.geometry.type === "Point") {
- 		return feature;
- 	} else if (feature.geometry.type === "MultiPoint" || feature.geometry.type === "LineString") {
- 		bbox = this.expandBBox(feature.geometry.coordinates, bbox);
- 	} else if (feature.geometry.type === "MuliLineString" || feature.geometry.type === "Polygon") {
- 		for (var i = 0; i < feature.geometry.coordinates.length; i++) {
- 			bbox = this.expandBBox(feature.geometry.coordinates[i], bbox);
- 		}
- 	} else if (feature.geometry.type === "MultiPolygon") {
- 		for (var i = 0; i < feature.geometry.coordinates.length; i++) {
- 			for (var j = 0; j < feature.geometry.coordinates[i].length; j++) {
- 				bbox = this.expandBBox(feature.geometry.coordinates[i][j], bbox);
- 			}
- 		}
+ 	var features = geoJSON;
+
+ 	if (geoJSON.type === "Feature") {
+ 		features = [JSON.parse(JSON.stringify(geoJSON))];
+ 	} else {
+ 		features = geoJSON.features;
+ 	}
+
+ 	for (var i = 0; i < features.length; i++) {
+ 		if (features[i].geometry.type === "Point") {
+ 			bbox = this.expandBBox([features[i].geometry.coordinates], bbox);
+	 	} else if (features[i].geometry.type === "MultiPoint" || features[i].geometry.type === "LineString") {
+	 		bbox = this.expandBBox(features[i].geometry.coordinates, bbox);
+	 	} else if (features[i].geometry.type === "MuliLineString" || features[i].geometry.type === "Polygon") {
+	 		for (var j = 0; j < features[i].geometry.coordinates.length; j++) {
+	 			bbox = this.expandBBox(features[i].geometry.coordinates[j], bbox);
+	 		}
+	 	} else if (features[i].geometry.type === "MultiPolygon") {
+	 		for (var j = 0; j < features[i].geometry.coordinates.length; j++) {
+	 			for (var k = 0; k < features[i].geometry.coordinates[j].length; j++) {
+	 				bbox = this.expandBBox(features[i].geometry.coordinates[j][k], bbox);
+	 			}
+	 		}
+	 	}
  	}
 
  	return { 

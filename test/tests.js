@@ -116,10 +116,12 @@ QUnit.test("Convex Hulls", function(assert) {
 });
 
 QUnit.test("Envelopes", function(assert) {
-	expect(4);
+	expect(5);
 	var env = this.triad.getEnvelope(this.polygonWithHoles);
+	var envFC = this.triad.getEnvelope(this.gjsPoints);
 	assert.equal(env.geometry.coordinates[0][0][0], 100.0, "Envelope minimum X is correct.");
 	assert.equal(env.geometry.coordinates[0][0][1], 0.0, "Envelope minimum Y is correct.");
 	assert.equal(env.geometry.coordinates[0][2][0], 101.0, "Envelope maximum X is correct.");
 	assert.equal(env.geometry.coordinates[0][2][1], 1.0, "Envelope maximum Y is correct.");
+	assert.equal(envFC.geometry.type, "Polygon", "Envelope of FeatureCollection is a Polygon.");
 });
