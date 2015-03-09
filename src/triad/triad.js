@@ -77,8 +77,27 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  Triad.prototype.inside = function(pointFeature, polygonFeature) {
 
+ 	//check the envelope first
+ 	var bbox = polygonFeature.bbox;
+ 	if (!bbox) {
+ 		var env = this.getEnvelope(polygonFeature);
+ 		var bbox = this.getBBox(env);
+ 	}
+
+ 	var bbox =this.getBBox(env);
+
+ 	if (pointFeature.geometry.coordinates[0] <= env.geometry.coordinates[0][0][0] || pointFeature.geometry.coordinates[1] <= env.geometry.coordinates[0][0][0]) {
+
+ 	}
+
  };
 
+
+/*
+ * Returns the envelope of a geoJson object.
+ * @param geoJSON {GeoJSON} the GeoJSON object from which to obtain the envelope.
+ * @return {GeoJSON Feature Polygon} The envelope as a GeoJSON Feature Polygon.
+*/
  Triad.prototype.getEnvelope = function(geoJSON) {
  	
  	var minx = Number.MAX_VALUE;
@@ -90,6 +109,8 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	var features = geoJSON;
 
+ 	//treat anything as a FeatureCollection
+ 	//TODO: handle Geometries and GeometryCollections
  	if (geoJSON.type === "Feature") {
  		features = [JSON.parse(JSON.stringify(geoJSON))];
  	} else {
@@ -132,6 +153,18 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 	};
  };
 
+//return [minx, miny, maxx, maxy] of an envelope polygon feature
+ Triad.prototype.getBBox = function(featureEnvelope) {
+ 	var coords = JSON.parse(JSON.stringify(featureEnvelope.geometry.coordinates));
+ 	return [[[coords[0]]], [[coords[1]]], [[coords[2]]], [[coords[3]]]];
+ };
+
+/*
+ * Expands a bounding box.
+ * @param coords {Array} coordinates to try and expand with.
+ * @param origBBox {Array} the bounding box to expand.
+ * @return {Array} the original bounding box, modified to include the minx, miny, maxx, and maxy of coords
+*/
  Triad.prototype.expandBBox = function(coords, origBBox) {
  	for (var i = 0; i < coords.length; i++) {
  		if (coords[i][0] < origBBox[0]) {
@@ -156,10 +189,31 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * @param p {GeoJSON Point Feature}
  * @param q {GeoJSON Point Feature}
  * @param r {GeoJSON Point Feature}
+ * @return {Number} less than zero if left, 0 if on the line, > 0 if to the right
 */
 Triad.prototype.crossProduct = function(p, q, r) {
 	return (q[0] - p[0]) * 
 		(r[1] - p[1]) - 
 		(q[1] - p[1]) * 
 		(r[0] - p[0]);
+};
+
+/*
+ * Tests whether a feature collections contains homogeneous geometry, e.g. all Polygons or all LineStrings, etc 
+ * @param featureCollection {GeoJSON FeatureCollection} the feature collection to test.
+ * @return boolean
+*/
+Triad.prototype.isHomogeneousFeatureCollection = function(featureCollection) {
+	var firstGeom;
+	if (featureCollection.features.length === 0) {
+		return true;
+	} else {
+		firstGeom = featureCollection.features[0].geometry.type;
+	}
+	for (var i = 1; i < features.length; i++) {
+		if (featureCollection.features[i].geometry.type !== firstGeom) {
+			return false;
+		}
+	}
+	return true;
 };

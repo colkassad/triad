@@ -7,6 +7,7 @@ QUnit.module("Triad", {
 		//some points
 		this.gjsPoint1 = {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}};
 		this.gjsPoint2 = {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[0,7.2]}};
+		this.gjsPoint3 = {"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[1,1]}};
 
 		this.polygonWithHoles = {type: "Feature", geometry: { 
 									"type": "Polygon",
@@ -124,4 +125,14 @@ QUnit.test("Envelopes", function(assert) {
 	assert.equal(env.geometry.coordinates[0][2][0], 101.0, "Envelope maximum X is correct.");
 	assert.equal(env.geometry.coordinates[0][2][1], 1.0, "Envelope maximum Y is correct.");
 	assert.equal(envFC.geometry.type, "Polygon", "Envelope of FeatureCollection is a Polygon.");
+});
+
+QUnit.test("Cross Product", function(assert) {
+	expect(2);
+	var p = [0, 0];
+	var q = [0, 7.5];
+	var r = [1, 1];
+	var r2 = [0, 5];
+	assert.ok(this.triad.crossProduct(p, q, r) < 0, "Cross product correctly reports orientation.");
+	assert.equal(this.triad.crossProduct(p, q, r2), 0, "Cross product correctly reports coincidence.");
 });

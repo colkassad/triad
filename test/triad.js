@@ -90,6 +90,8 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	var features = geoJSON;
 
+ 	//treat anything as a FeatureCollection
+ 	//TODO: handle Geometries and GeometryCollections
  	if (geoJSON.type === "Feature") {
  		features = [JSON.parse(JSON.stringify(geoJSON))];
  	} else {
@@ -156,10 +158,31 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * @param p {GeoJSON Point Feature}
  * @param q {GeoJSON Point Feature}
  * @param r {GeoJSON Point Feature}
+ * @return {Number} less than zero if left, 0 if on the line, > 0 if to the right
 */
 Triad.prototype.crossProduct = function(p, q, r) {
 	return (q[0] - p[0]) * 
 		(r[1] - p[1]) - 
 		(q[1] - p[1]) * 
 		(r[0] - p[0]);
+};
+
+/*
+ * Tests whether a feature collections contains homogeneous geometry, e.g. all Polygons or all LineStrings, etc 
+ * @param featureCollection {GeoJSON FeatureCollection} the feature collection to test.
+ * @return boolean
+*/
+Triad.prototype.isHomogeneousFeatureCollection = function(featureCollection) {
+	var firstGeom;
+	if (featureCollection.features.length === 0) {
+		return true;
+	} else {
+		firstGeom = featureCollection.features[0].geometry.type;
+	}
+	for (var i = 1; i < features.length; i++) {
+		if (featureCollection.features[i].geometry.type !== firstGeom) {
+			return false;
+		}
+	}
+	return true;
 };
