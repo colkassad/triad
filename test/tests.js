@@ -136,3 +136,10 @@ QUnit.test("Cross Product", function(assert) {
 	assert.ok(this.triad.crossProduct(p, q, r) < 0, "Cross product correctly reports orientation.");
 	assert.equal(this.triad.crossProduct(p, q, r2), 0, "Cross product correctly reports coincidence.");
 });
+
+QUnit.test("Inside", function(assert) {
+	expect(3);
+	assert.equal(this.triad.inside(this.gjsPointInsideRectangle, this.gjsPolyRectangle), true, "Point within polygon rectangle returns true.");
+	assert.equal(this.triad.inside(this.gjsPointInsidePolyWithHole, this.gjsPolyWithHole), true, "Point within polygon with hole returns true if not in hole.");
+	assert.equal(this.triad.inside(this.gjsPointInsideHole, this.gjsPolyWithHole), false, "Point within polygon with hole returns false if in hole.");
+});
