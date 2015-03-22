@@ -73,8 +73,6 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * @return {GeoJSON Polygon Feature} the polygon to return.
  */
  Triad.prototype.getPolygon = function(pointFeatureCollection) {
-
-<<<<<<< HEAD
  	var coords = [[]];
 
  	for (var i = 0 i < pointFeatureCollection.features; i++) {
@@ -83,7 +81,6 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  	}
 
  	return {type: "Feature", geometry: { type: "Polygon", coords: coords}, properties: {}};
-=======
  };
 
  Triad.prototype.inside = function(pointFeature, polygonFeature) {
@@ -128,7 +125,6 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  	return false;
  	
  };
->>>>>>> 37c86d78cd909b35990b7f972617db473d4d6250
 
 
  Triad.prototype.inRing = function(pointFeature, linearRing) {
