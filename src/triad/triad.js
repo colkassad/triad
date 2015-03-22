@@ -69,29 +69,21 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
 /*
  * Constructs a GeoJSON Polygon Feature from a GeoJSON FeatureCollection of points.
- * 
+ * @param pointFeatureCollection {GeoJSON Point FeatureCollection} The feature collection from which to construct the polygon.
+ * @return {GeoJSON Polygon Feature} the polygon to return.
  */
  Triad.prototype.getPolygon = function(pointFeatureCollection) {
 
- };
+ 	var coords = [[]];
 
- Triad.prototype.inside = function(pointFeature, polygonFeature) {
-
- 	//check the envelope first
- 	var bbox = polygonFeature.bbox;
- 	if (!bbox) {
- 		var env = this.getEnvelope(polygonFeature);
- 		var bbox = this.getBBox(env);
+ 	for (var i = 0 i < pointFeatureCollection.features; i++) {
+ 		var coord = [pointFeatureCollection.featurse[i].geometry.coords[0], pointFeatureCollection.features[i].geometry.coords[1]];
+ 		coords[0].push(coord);
  	}
 
- 	var bbox =this.getBBox(env);
-
- 	if (pointFeature.geometry.coordinates[0] <= env.geometry.coordinates[0][0][0] || pointFeature.geometry.coordinates[1] <= env.geometry.coordinates[0][0][0]) {
-
- 	}
+ 	return {type: "Feature", geometry: { type: "Polygon", coords: coords}, properties: {}};
 
  };
-
 
 /*
  * Returns the envelope of a geoJson object.
@@ -217,3 +209,4 @@ Triad.prototype.isHomogeneousFeatureCollection = function(featureCollection) {
 	}
 	return true;
 };
+
