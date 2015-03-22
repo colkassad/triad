@@ -74,6 +74,7 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  */
  Triad.prototype.getPolygon = function(pointFeatureCollection) {
 
+<<<<<<< HEAD
  	var coords = [[]];
 
  	for (var i = 0 i < pointFeatureCollection.features; i++) {
@@ -82,7 +83,65 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  	}
 
  	return {type: "Feature", geometry: { type: "Polygon", coords: coords}, properties: {}};
+=======
+ };
 
+ Triad.prototype.inside = function(pointFeature, polygonFeature) {
+ 	var self = this;
+ 	var polys = polygonFeature.geometry.coordinates;
+ 	if (polygonFeature.geometry.type === 'Polygon') {
+ 		polys = [polys]; //handle multipolygon and polygon
+ 	}
+
+ 	//check for a bbox property. If there is one, 
+ 	//assume it is correct and check if the point intersects the bbox first.
+ 	var bbox;
+ 	var intersectsBBox = true;
+ 	if (polygonFeature.bbox) {
+ 		bbox = polygonFeature.bbox;
+ 	}
+ 	if (polygonFeature.geometry.bbox) {
+ 		bbox = polygonFeature.geometry.bbox;
+ 	}
+ 	if (bbox) {
+ 		var x = pointFeature.geometry.coordinates[0];
+ 		var y = pointFeature.geometry.coordinates[1];
+ 		if (x < bbox[0] || x > bbox[2] || y < bbox[1] || y > bbox[3]) {
+ 			intersectsBBox = false;
+ 		}
+ 	}
+
+ 	if (intersectsBBox) {
+		for (var i = 0; i < polys.length; i++) {
+			if (self.inRing(pointFeature, polys[i][0])) {
+				var k = 1;
+				while (k < polys[i].length) {
+					if (self.inRing(pointFeature, polys[i][k])) {
+						return false;
+					}
+					k++;
+				}
+				return true;
+			}
+ 		}
+ 	}
+ 	return false;
+ 	
+ };
+>>>>>>> 37c86d78cd909b35990b7f972617db473d4d6250
+
+
+ Triad.prototype.inRing = function(pointFeature, linearRing) {
+	var insideRing = false;
+	for (var i = 0, j = linearRing.length - 1 ; i < linearRing.length; j = i++) {
+		if (((linearRing[i][1]>pointFeature.geometry.coordinates[1]) != 
+			(linearRing[j][1]>pointFeature.geometry.coordinates[1])) &&
+				(pointFeature.geometry.coordinates[0] < (linearRing[j][0]-linearRing[i][0]) * 
+					(pointFeature.geometry.coordinates[1]-linearRing[i][1]) / 
+						(linearRing[j][1]-linearRing[i][1]) + linearRing[i][0]) )
+		insideRing = !insideRing;
+	}
+	return insideRing;
  };
 
 /*

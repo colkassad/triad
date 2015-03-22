@@ -76,9 +76,68 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  };
 
  Triad.prototype.inside = function(pointFeature, polygonFeature) {
+ 	var self = this;
+ 	var polys = polygonFeature.geometry.coordinates;
+ 	if (polygonFeature.geometry.type === 'Polygon') {
+ 		polys = [polys]; //handle multipolygon and polygon
+ 	}
 
+ 	//check for a bbox property. If there is one, 
+ 	//assume it is correct and check if the point intersects the bbox first.
+ 	var bbox;
+ 	var intersectsBBox = true;
+ 	if (polygonFeature.bbox) {
+ 		bbox = polygonFeature.bbox;
+ 	}
+ 	if (polygonFeature.geometry.bbox) {
+ 		bbox = polygonFeature.geometry.bbox;
+ 	}
+ 	if (bbox) {
+ 		var x = pointFeature.geometry.coordinates[0];
+ 		var y = pointFeature.geometry.coordinates[1];
+ 		if (x < bbox[0] || x > bbox[2] || y < bbox[1] || y > bbox[3]) {
+ 			intersectsBBox = false;
+ 		}
+ 	}
+
+ 	if (intersectsBBox) {
+		for (var i = 0; i < polys.length; i++) {
+			if (self.inRing(pointFeature, polys[i][0])) {
+				var k = 1;
+				while (k < polys[i].length) {
+					if (self.inRing(pointFeature, polys[i][k])) {
+						return false;
+					}
+					k++;
+				}
+				return true;
+			}
+ 		}
+ 	}
+ 	return false;
+ 	
  };
 
+
+ Triad.prototype.inRing = function(pointFeature, linearRing) {
+	var insideRing = false;
+	for (var i = 0, j = linearRing.length - 1 ; i < linearRing.length; j = i++) {
+		if (((linearRing[i][1]>pointFeature.geometry.coordinates[1]) != 
+			(linearRing[j][1]>pointFeature.geometry.coordinates[1])) &&
+				(pointFeature.geometry.coordinates[0] < (linearRing[j][0]-linearRing[i][0]) * 
+					(pointFeature.geometry.coordinates[1]-linearRing[i][1]) / 
+						(linearRing[j][1]-linearRing[i][1]) + linearRing[i][0]) )
+		insideRing = !insideRing;
+	}
+	return insideRing;
+ };
+
+
+/*
+ * Returns the envelope of a geoJson object.
+ * @param geoJSON {GeoJSON} the GeoJSON object from which to obtain the envelope.
+ * @return {GeoJSON Feature Polygon} The envelope as a GeoJSON Feature Polygon.
+*/
  Triad.prototype.getEnvelope = function(geoJSON) {
  	
  	var minx = Number.MAX_VALUE;
@@ -134,6 +193,18 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 	};
  };
 
+//return [minx, miny, maxx, maxy] of an envelope polygon feature
+ Triad.prototype.getBBox = function(featureEnvelope) {
+ 	var coords = JSON.parse(JSON.stringify(featureEnvelope.geometry.coordinates));
+ 	return [[[coords[0]]], [[coords[1]]], [[coords[2]]], [[coords[3]]]];
+ };
+
+/*
+ * Expands a bounding box.
+ * @param coords {Array} coordinates to try and expand with.
+ * @param origBBox {Array} the bounding box to expand.
+ * @return {Array} the original bounding box, modified to include the minx, miny, maxx, and maxy of coords
+*/
  Triad.prototype.expandBBox = function(coords, origBBox) {
  	for (var i = 0; i < coords.length; i++) {
  		if (coords[i][0] < origBBox[0]) {
