@@ -68,17 +68,25 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 };
 
 /*
- * Constructs a GeoJSON Polygon Feature from a GeoJSON FeatureCollection of points.
- * @param pointFeatureCollection {GeoJSON Point FeatureCollection} The feature collection from which to construct the polygon.
+ * Constructs a GeoJSON Polygon Feature from a GeoJSON FeatureCollection of points, a GeoJSON MultiPoint Feature, or a GeoJSON LineString Feature. 
+ * The points or line are assumed to construct a linear ring.
+ * @param geoJSON {GeoJSON Point FeatureCollection | GeoJSON MultiPoint Feature | GeoJSON LineString Feature} The GeoJSON object from which to construct the polygon.
  * @return {GeoJSON Polygon Feature} the polygon to return.
  */
- Triad.prototype.getPolygon = function(pointFeatureCollection) {
+ Triad.prototype.getPolygon = function(geoJSON) {
+ 	
  	var coords = [[]];
 
- 	for (var i = 0 i < pointFeatureCollection.features; i++) {
- 		var coord = [pointFeatureCollection.featurse[i].geometry.coords[0], pointFeatureCollection.features[i].geometry.coords[1]];
- 		coords[0].push(coord);
- 	}
+ 	//feature collection
+    if (geoJSON.features) {
+    	for (var i = 0; i < geoJSON.features; i++) {
+ 			var coord = [geoJSON.featurse[i].geometry.coords[0], geoJSON.features[i].geometry.coords[1]];
+ 			coords[0].push(coord);
+ 		}
+    } else if (geoJSON.geometry.type === "MultiPoint" || geoJSON.geometry.type === "LineString") {
+    	var srcCoords = JSON.stringify(geoJSON.geometry.coordinates);
+    	coords = JSON.parse(srcCoords);
+    }
 
  	return {type: "Feature", geometry: { type: "Polygon", coords: coords}, properties: {}};
  };
@@ -90,10 +98,13 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  		polys = [polys]; //handle multipolygon and polygon
  	}
 
- 	//check for a bbox property. If there is one, 
+ 	//assume this feature intersects the bounding box first.
+ 	//we'll test this later.
+ 	var intersectsBBox = true;
+
+	//check for a bbox property. If there is one, 
  	//assume it is correct and check if the point intersects the bbox first.
  	var bbox;
- 	var intersectsBBox = true;
  	if (polygonFeature.bbox) {
  		bbox = polygonFeature.bbox;
  	}
@@ -206,13 +217,28 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  	return [[[coords[0]]], [[coords[1]]], [[coords[2]]], [[coords[3]]]];
  };
 
+
+ //assigns a bounding box to a GeoJSON Feature or FeatureCollection
+ Triad.prototype.assignBBox = function(geoJSON) {
+ 	var env = this.getEnvelope(geoJSON);
+ 	var bbox = this.getBBox(env);
+ 	geoJSON.bbox = bbox;
+ 	return geoJSON;
+ };
+
 /*
- * Expands a bounding box.
+ * Expands a bounding box to include the specified coordinate list.
  * @param coords {Array} coordinates to try and expand with.
  * @param origBBox {Array} the bounding box to expand.
  * @return {Array} the original bounding box, modified to include the minx, miny, maxx, and maxy of coords
 */
  Triad.prototype.expandBBox = function(coords, origBBox) {
+ 	
+ 	//handle a single point
+ 	if (coords.length === 2 && !coords[0].length) {
+ 		coords = [coords];
+ 	}
+
  	for (var i = 0; i < coords.length; i++) {
  		if (coords[i][0] < origBBox[0]) {
  			origBBox[0] = coords[i][0];
