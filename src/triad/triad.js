@@ -90,8 +90,9 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	return {type: "Feature", geometry: { type: "Polygon", coords: coords}, properties: {}};
  };
-
- Triad.prototype.inside = function(pointFeature, polygonFeature) {
+ 
+ //note that for multipoints, each point my lie within the poly to return true. Use intersects to test if some do.
+ Triad.prototype.pointInPolygon = function(pointFeature, polygonFeature) {
  	var self = this;
  	var polys = polygonFeature.geometry.coordinates;
  	if (polygonFeature.geometry.type === 'Polygon') {
@@ -114,17 +115,18 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  	if (bbox) {
  		var x = pointFeature.geometry.coordinates[0];
  		var y = pointFeature.geometry.coordinates[1];
- 		if (x < bbox[0] || x > bbox[2] || y < bbox[1] || y > bbox[3]) {
+
+ 		if (pointInBBox([x,y], bbox)) {
  			intersectsBBox = false;
  		}
  	}
 
  	if (intersectsBBox) {
 		for (var i = 0; i < polys.length; i++) {
-			if (self.inRing(pointFeature, polys[i][0])) {
+			if (self.inRing(pointFeature.coordinates, polys[i][0])) {
 				var k = 1;
 				while (k < polys[i].length) {
-					if (self.inRing(pointFeature, polys[i][k])) {
+					if (self.inRing(pointFeature.coordinates, polys[i][k])) {
 						return false;
 					}
 					k++;
@@ -133,18 +135,27 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 			}
  		}
  	}
+
  	return false;
  	
  };
 
+ Triad.prototype.pointInBBox = function(pointCoord, bbox) {
+	var x = pointCoord[0];
+	var y = pointCoord[1];
+	if (x < bbox[0] || x > bbox[2] || y < bbox[1] || y > bbox[3]) {
+		intersectsBBox = false;
+	}
+ };
 
- Triad.prototype.inRing = function(pointFeature, linearRing) {
+
+ Triad.prototype.inRing = function(pointCoord, linearRing) {
 	var insideRing = false;
 	for (var i = 0, j = linearRing.length - 1 ; i < linearRing.length; j = i++) {
-		if (((linearRing[i][1]>pointFeature.geometry.coordinates[1]) != 
-			(linearRing[j][1]>pointFeature.geometry.coordinates[1])) &&
-				(pointFeature.geometry.coordinates[0] < (linearRing[j][0]-linearRing[i][0]) * 
-					(pointFeature.geometry.coordinates[1]-linearRing[i][1]) / 
+		if (((linearRing[i][1] > pointCoord[1]) != 
+			(linearRing[j][1] > pointCoord[1])) &&
+				(pointCoord[0] < (linearRing[j][0]-linearRing[i][0]) * 
+					(pointCoord[1] - linearRing[i][1]) / 
 						(linearRing[j][1]-linearRing[i][1]) + linearRing[i][0]) )
 		insideRing = !insideRing;
 	}
@@ -156,7 +167,7 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * @param geoJSON {GeoJSON} the GeoJSON object from which to obtain the envelope.
  * @return {GeoJSON Feature Polygon} The envelope as a GeoJSON Feature Polygon.
 */
- Triad.prototype.getEnvelope = function(geoJSON) {
+ Triad.prototype.getBBox = function(geoJSON) {
  	
  	var minx = Number.MAX_VALUE;
  	var miny = Number.MAX_VALUE;
@@ -167,63 +178,44 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	var features = geoJSON;
 
- 	//treat anything as a FeatureCollection
- 	//TODO: handle Geometries and GeometryCollections
- 	if (geoJSON.type === "Feature") {
- 		features = [JSON.parse(JSON.stringify(geoJSON))];
- 	} else {
+ 	var gjsType = "Array";
+
+ 	if (geoJSON.type) {
+ 		gjsType = geoJSON.type;
+ 	}
+
+ 	if (gjsType === "Feature") {
+ 		features = [geoJSON];
+ 	} else if (gjsType === "FeatureCollection") {
  		features = geoJSON.features;
+ 	} else if (gjsType === "GeometryCollection") {
+ 		features = geoJSON.geometries;
+ 	} else {
+ 		if (geoJSON.coordinates) {
+ 			features = geoJSON.coordinates;
+ 		}
  	}
 
  	for (var i = 0; i < features.length; i++) {
- 		if (features[i].geometry.type === "Point") {
- 			bbox = this.expandBBox([features[i].geometry.coordinates], bbox);
-	 	} else if (features[i].geometry.type === "MultiPoint" || features[i].geometry.type === "LineString") {
-	 		bbox = this.expandBBox(features[i].geometry.coordinates, bbox);
-	 	} else if (features[i].geometry.type === "MuliLineString" || features[i].geometry.type === "Polygon") {
-	 		for (var j = 0; j < features[i].geometry.coordinates.length; j++) {
-	 			bbox = this.expandBBox(features[i].geometry.coordinates[j], bbox);
+ 		var coords = features[i]; //assume just a list of positions first.
+ 		if (gjsType !== "GeometryCollection" && features[i].type) {
+ 			coords = features[i].geometry.coordinates;
+ 		}
+ 		if (gjsType === "Point" || gjsType === "MultiPoint" || gjsType === "LineString") {
+	 		bbox = this.expandBBox(coords, bbox);
+	 	} else if (gjsType === "MultiLineString" || gjsType === "Polygon") {
+	 		for (var j = 0; j < coords.length; j++) {
+	 			bbox = this.expandBBox(coords[j], bbox);
 	 		}
-	 	} else if (features[i].geometry.type === "MultiPolygon") {
-	 		for (var j = 0; j < features[i].geometry.coordinates.length; j++) {
-	 			for (var k = 0; k < features[i].geometry.coordinates[j].length; j++) {
-	 				bbox = this.expandBBox(features[i].geometry.coordinates[j][k], bbox);
+	 	} else if (gjsType === "MultiPolygon") {
+	 		for (var j = 0; j < coords.length; j++) {
+	 			for (var k = 0; k < coords[j].length; j++) {
+	 				bbox = this.expandBBox(coords[j][k], bbox);
 	 			}
 	 		}
 	 	}
  	}
-
- 	return { 
-		type: "Feature", 
-		geometry: {
-			type: "Polygon", 
-			coordinates: [
-				[
- 					[bbox[0], bbox[1]], 
- 					[bbox[0], bbox[3]], 
- 					[bbox[2], bbox[3]], 
- 					[bbox[2], bbox[1]], 
- 					[bbox[0], bbox[1]]
-				]
-			]
-		}, 
-		properties: {}
-	};
- };
-
-//return [minx, miny, maxx, maxy] of an envelope polygon feature
- Triad.prototype.getBBox = function(featureEnvelope) {
- 	var coords = JSON.parse(JSON.stringify(featureEnvelope.geometry.coordinates));
- 	return [[[coords[0]]], [[coords[1]]], [[coords[2]]], [[coords[3]]]];
- };
-
-
- //assigns a bounding box to a GeoJSON Feature or FeatureCollection
- Triad.prototype.assignBBox = function(geoJSON) {
- 	var env = this.getEnvelope(geoJSON);
- 	var bbox = this.getBBox(env);
- 	geoJSON.bbox = bbox;
- 	return geoJSON;
+ 	return bbox;
  };
 
 /*
@@ -262,7 +254,7 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  * @param p {GeoJSON Point Feature}
  * @param q {GeoJSON Point Feature}
  * @param r {GeoJSON Point Feature}
- * @return {Number} less than zero if left, 0 if on the line, > 0 if to the right
+ * @return {Number} < zero if left, 0 if on the line, > 0 if to the right
 */
 Triad.prototype.crossProduct = function(p, q, r) {
 	return (q[0] - p[0]) * 
@@ -283,11 +275,180 @@ Triad.prototype.isHomogeneousFeatureCollection = function(featureCollection) {
 	} else {
 		firstGeom = featureCollection.features[0].geometry.type;
 	}
-	for (var i = 1; i < features.length; i++) {
+	for (var i = 0; i < features.length; i++) {
 		if (featureCollection.features[i].geometry.type !== firstGeom) {
 			return false;
 		}
 	}
 	return true;
+};
+
+Triad.prototype.clipPointsToPolygon = function(gjsPoints, gjsPoly) {
+	
+	var self = this;
+
+	//get a copy of the properties
+	var props = self.cloneObject(gjsLine.properties);
+
+	var result = { type: "Feature", geometry: { type: gjsPoints.geometry.type, coordinates: [] }, properties: props };
+
+	if (gjsLine.geometry.coordinates.length === 0) {
+		return result;
+	}
+
+	if (gjsPoly.geometry.coordinates.length === 0) {
+		return result;
+	}
+
+	//Handle intersecting points with polygons and multipolygons.
+	//If the point(s) is not within the polygon, return the empty result Feature
+	if ((gjsLine.geometry.type === "Point" || 
+		gjsLine.geometry.type === "MultiPoint") && 
+		(gjsPoly.geometry.type === "Polygon" || 
+		gjsPoly.geometry.type == "MultiPolygon")) {
+		var points = gjsLine.geometry.coordinates;
+		if (gjsLine.type === "Point") {
+			//handle multipoint
+			points = [points];
+		}
+		for (var i = 0; i < points.length; i++) {
+			//stupid hack by creating a feature here. I should handle this better.
+			if (self.pointInPolygon({type:"Feature", geometry:{ type:"Point", coordinates: points[i], properties: {} } }, gjsPoly)) {
+				var coord = self.cloneObject(points[i]);
+				if (gjsLine.type === "Point") {
+					result.geometry.coordinates = coord;
+				} else {
+					result.geometry.coordinates.push(coord);
+				}
+			}
+		}
+		return result;
+	}
+};
+
+Triad.prototype.getPositions = function(geoJson) {
+	var positions = [];
+	if (geoJson.type === "Point" || geoJson.type === "MultiPoint" || geoJson.type === "LineString" || geoJson.type === "MultiLineString" || geoJson.type === "Polygon" || geoJson.type === "MultiPolygon") {
+		positions = positions.concat.apply(positions, geoJson.coordinates);
+	}
+};
+
+Triad.prototype.clipLineStringToPolygon = function(gjsLine, gjsPoly) {
+
+	var self = this;
+	var insideRing = false;
+
+	var result = self.cloneObject(gjsLine);
+
+	if (gjsLine.geometry.coordinates.length === 0) {
+		return result;
+	}
+
+	if (gjsPoly.geometry.coordinates.length === 0) {
+		return result;
+	}
+
+	var line = result.geometry.coordinates;
+
+	//treat as Multilinetring
+	if (result.type === "LineString") {
+		line = [line];
+	}
+
+	var priorityQueue = [];
+
+	var searchTree = { value: null, left: null, right: null };
+
+
+	//for each individual linestring
+	for (var i = 0; i < line.length; i++) {
+
+
+		
+		var intersectingLineSegmentStart = -1;
+		var intersectingLineSegmentEnd = -1;
+
+		//for each linestring position (vertex)
+		for (var j = 0; j < line[i].length; j++) {
+
+			if (j < line[i].length - 1) {
+
+				var lineStartCoord = line[i][j];
+				var lineEndCoord = line[i][j+1];
+
+				var line1StartX = lineStartCoord[0];
+				var line1StartY = lineStartCoord[1];
+
+				var line1EndX = lineEndCoord[0];
+				var line1EndY = lineEndCoord[1];
+
+				var polys = gjsPoly.geometry.coordinates;
+
+				if (gjsPoly.type === "Polygon") {
+					polys = [polys];
+				}
+
+				//for each individual polygon
+				for (var k = 0; k < polys.length; k++) {
+
+					//for each linear ring in the polygon
+					for (var m = 0; m < polys[k].length; m++) {
+						//for each positional coordinate in the linear ring
+						for (p = 0; p < polys[k][m].length; p++) {
+							if (p < polys[k][m].length - 1) {
+								
+								var linRingSegStartCoord = polys[k][m][p];
+								var linRingSegEndCoord = polys[k][m][p+1];
+
+								var line2StartX = linRingSegStartCoord[0];
+								var line2StartY = linRingSegStartCoord[1];
+
+								var line2EndX = linRingSegEndCoord[0];
+								var line2EndY = linRingSegEndCoord[1];
+
+								var denom = ((line2EndY - line2StartY) * 
+									(line1EndX - line1StartX)) - 
+									((line2EndX - line2StartX) * 
+									(line1EndY - line1StartY));
+
+								if (denom === 0) {
+									//the line segment and the polygon edge segment are parrallel.
+									continue;
+								} else {
+									
+									var a = line1StartY - line2StartY;
+									var b = line1StartX - line2StartX;
+								    var numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
+    								var numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
+    								a = numerator1 / denominator;
+    								b = numerator2 / denominator;
+
+    								//an infinite line along the line segment and an infinite line
+    								//along the polygon segment will intersect here.
+    								var x = line1StartX + (a * (line1EndX - line1StartX));
+    								var y = line1StartY + (a * (line1EndY - line1StartY));
+
+    								if (a > 0 && a < 1 && b > 0 && b < 1) {
+    									//(x, y) falls on the line segment and the polygon edge segment
+
+    									//index of this position along the line
+    									intersectingLineSegmentStart = j;
+    									
+    								}
+
+								}
+
+							}
+						}
+					}				
+				}
+			}
+		}
+	}
+};
+
+Triad.prototype.cloneObject = function(object) {
+	var strObj = JSON.stringify(object);
+	return JSON.parse(strObj);
 };
 
