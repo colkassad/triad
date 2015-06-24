@@ -1,7 +1,7 @@
 
-function Triad() {
+var Triad = function() {
 
-}
+};
 
 /* Outputs a GeoJSON Feature Polygon that is the convex hull of an array of GeoJSON Point Features.
  * @param points {GeoJSON FeatureCollection} An feature collection of GeoJSON Point Features.
@@ -123,10 +123,10 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 
  	if (intersectsBBox) {
 		for (var i = 0; i < polys.length; i++) {
-			if (self.inRing(pointFeature.coordinates, polys[i][0])) {
+			if (self.inRing(pointFeature.geometry.coordinates, polys[i][0])) {
 				var k = 1;
 				while (k < polys[i].length) {
-					if (self.inRing(pointFeature.coordinates, polys[i][k])) {
+					if (self.inRing(pointFeature.geometry.coordinates, polys[i][k])) {
 						return false;
 					}
 					k++;
@@ -163,58 +163,62 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
  };
 
 /*
- * Returns the envelope of a geoJson object.
- * @param geoJSON {GeoJSON} the GeoJSON object from which to obtain the envelope.
- * @return {GeoJSON Feature Polygon} The envelope as a GeoJSON Feature Polygon.
+ * Returns the bounding box of a geoJson object.
+ * @param geoJSON {GeoJSON} the GeoJSON object from which to obtain the bounding box.
+ * @return {Array} The bounding box as the array: [minx, miny, maxx, maxy] .
 */
  Triad.prototype.getBBox = function(geoJSON) {
  	
+	//Obtains a minx, miny, maxx, maxy bounding box from a geojson coordinate array. Recursive if needed.
+	var getMinMaxCoord = function(currMinMaxBBox, coords) {
+		if (coords.length === 2 && !Array.isArray(coords[0])) {
+			if (coords[0] < currMinMaxBBox[0]) {
+				currMinMaxBBox[0] = coords[0];
+			}
+			if (coords[1] < currMinMaxBBox[1]) {
+				currMinMaxBBox[1] = coords[1];
+			}
+			if (coords[0] > currMinMaxBBox[2]) {
+				currMinMaxBBox[2] = coords[0];
+			}
+			if (coords[1] > currMinMaxBBox[3]) {
+				currMinMaxBBox[3] = coords[1];
+			}
+		} else {
+			for (var i = 0; i < coords.length; i++) {
+				getMinMaxCoord(currMinMaxBBox, coords[i]);
+			}
+		}
+	};
+
  	var minx = Number.MAX_VALUE;
  	var miny = Number.MAX_VALUE;
- 	var maxx = Number.MIN_VALUE;
- 	var maxy = Number.MIN_VALUE;
+ 	var maxx = -Number.MAX_VALUE;
+ 	var maxy = -Number.MAX_VALUE;
 
  	var bbox = [minx, miny, maxx, maxy];
+ 	
+ 	var coords;
 
- 	var features = geoJSON;
-
- 	var gjsType = "Array";
-
- 	if (geoJSON.type) {
- 		gjsType = geoJSON.type;
- 	}
-
- 	if (gjsType === "Feature") {
- 		features = [geoJSON];
- 	} else if (gjsType === "FeatureCollection") {
- 		features = geoJSON.features;
- 	} else if (gjsType === "GeometryCollection") {
- 		features = geoJSON.geometries;
- 	} else {
- 		if (geoJSON.coordinates) {
- 			features = geoJSON.coordinates;
+ 	//checks for FeatureCollection, GeometryCollection, Feature, then points, lines, etc.
+ 	if (geoJSON.type && geoJSON.type === "FeatureCollection") {
+ 		for (var i = 0; i < geoJSON.features.length; i++) {
+ 			coords = geoJSON.features[i].geometry.coordinates;
+ 			getMinMaxCoord(bbox, coords);
  		}
- 	}
-
- 	for (var i = 0; i < features.length; i++) {
- 		var coords = features[i]; //assume just a list of positions first.
- 		if (gjsType !== "GeometryCollection" && features[i].type) {
- 			coords = features[i].geometry.coordinates;
+ 	} else if (geoJSON.type  && geoJSON.type === "GeometryCollection") {
+ 		for (var i = 0; i < geoJSON.geometries.length; i++) {
+ 			coords = geoJSON.geometries[i].coordinates;
+ 			getMinMaxCoord(bbox, coords);
  		}
- 		if (gjsType === "Point" || gjsType === "MultiPoint" || gjsType === "LineString") {
-	 		bbox = this.expandBBox(coords, bbox);
-	 	} else if (gjsType === "MultiLineString" || gjsType === "Polygon") {
-	 		for (var j = 0; j < coords.length; j++) {
-	 			bbox = this.expandBBox(coords[j], bbox);
-	 		}
-	 	} else if (gjsType === "MultiPolygon") {
-	 		for (var j = 0; j < coords.length; j++) {
-	 			for (var k = 0; k < coords[j].length; j++) {
-	 				bbox = this.expandBBox(coords[j][k], bbox);
-	 			}
-	 		}
-	 	}
+ 	} else if (geoJSON.type && geoJSON.type === "Feature") {
+ 		coords = geoJSON.geometry.coordinates;
+ 		getMinMaxCoord(bbox, coords);
+ 	} else if (geoJSON.type) {
+ 		coords = geoJSON.coordinates;
+ 		getMinMaxCoord(bbox, coords);
  	}
+ 	
  	return bbox;
  };
 
@@ -362,9 +366,6 @@ Triad.prototype.clipLineStringToPolygon = function(gjsLine, gjsPoly) {
 
 	//for each individual linestring
 	for (var i = 0; i < line.length; i++) {
-
-
-		
 		var intersectingLineSegmentStart = -1;
 		var intersectingLineSegmentEnd = -1;
 
@@ -420,8 +421,8 @@ Triad.prototype.clipLineStringToPolygon = function(gjsLine, gjsPoly) {
 									var b = line1StartX - line2StartX;
 								    var numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
     								var numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
-    								a = numerator1 / denominator;
-    								b = numerator2 / denominator;
+    								a = numerator1 / denom;
+    								b = numerator2 / denom;
 
     								//an infinite line along the line segment and an infinite line
     								//along the polygon segment will intersect here.

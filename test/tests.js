@@ -117,14 +117,13 @@ QUnit.test("Convex Hulls", function(assert) {
 });
 
 QUnit.test("Envelopes", function(assert) {
-	expect(5);
-	var env = this.triad.getEnvelope(this.polygonWithHoles);
-	var envFC = this.triad.getEnvelope(this.gjsPoints);
-	assert.equal(env.geometry.coordinates[0][0][0], 100.0, "Envelope minimum X is correct.");
-	assert.equal(env.geometry.coordinates[0][0][1], 0.0, "Envelope minimum Y is correct.");
-	assert.equal(env.geometry.coordinates[0][2][0], 101.0, "Envelope maximum X is correct.");
-	assert.equal(env.geometry.coordinates[0][2][1], 1.0, "Envelope maximum Y is correct.");
-	assert.equal(envFC.geometry.type, "Polygon", "Envelope of FeatureCollection is a Polygon.");
+	expect(4);
+	var env = this.triad.getBBox(this.polygonWithHoles);
+	var envFC = this.triad.getBBox(this.gjsPoints);
+	assert.equal(env[0], 100.0, "Envelope minimum X is correct.");
+	assert.equal(env[1], 0.0, "Envelope minimum Y is correct.");
+	assert.equal(env[2], 101.0, "Envelope maximum X is correct.");
+	assert.equal(env[3], 1.0, "Envelope maximum Y is correct.");
 });
 
 QUnit.test("Cross Product", function(assert) {
@@ -142,4 +141,18 @@ QUnit.test("Point in Polygon", function(assert) {
 	assert.equal(this.triad.pointInPolygon(this.gjsPointInsideRectangle, this.gjsPolyRectangle), true, "Point within polygon rectangle returns true.");
 	assert.equal(this.triad.pointInPolygon(this.gjsPointInsidePolyWithHole, this.gjsPolyWithHole), true, "Point within polygon with hole returns true if not in hole.");
 	assert.equal(this.triad.pointInPolygon(this.gjsPointInsideHole, this.gjsPolyWithHole), false, "Point within polygon with hole returns false if in hole.");
+});
+
+QUnit.test("Clip LineString to Polygon", function(assert) {
+	expect(3);
+	var line = {type: "Feature", geometry: {type: "LineString", coordinates: [[-1, 5], [11, 5]]}, properties: {}};
+	var poly = {type:"Feature", geometry: {type: "Polygon", coordinates: [[[0,0], [0, 10], [10,10], [10,0], [0,0]]]}, properties: {}};
+	var clippedLine = this.triad.clipLineStringToPolygon(line, poly);
+	assert.equal(clippedLine.type, "Feature", "Clipped line is a GeoJSON feature");
+	assert.equal(clippedLine.geometry.type, "LineString", "Clipped line GeoJSON is of type LineString");
+	var startX = clippedLine.geometry.coordinates[0][0];
+	var endX = clippedLine.geometry.coordinates[1][0];
+	var startY = clippedLine.geometry.coordinates[0][1];
+	var endY = clippedLine.geometry.coordinates[1][1];
+	assert.ok(startX === 0 && startY === 5 && endX === 10 && endY === 5, "Line clipped propertly");
 });
