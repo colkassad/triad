@@ -3,6 +3,49 @@ var Triad = function() {
 
 };
 
+/* Outputs an array of ordered output coordinates that is the convex hull of an array of input coordinates.
+ * @param coords {Array} An array of coordinates e.g. [[0, 0], [0, 1]]
+ * @return {Array} An array representing the convex hull of the input coordinates.
+ * Uses the Monotone Chain algorithm: http://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
+*/
+Triad.prototype.convexHull = function(coords) {
+	
+	//handle degenerate cases
+	if (coords.length <= 2) {
+		return coords.slice();
+	}
+
+	//sort lexigraphically
+	coords.sort(function(a, b) {
+		return a[0] == b[0] ? a[1] - b[1] : a[0] - b[0];
+	});
+
+	//process the lower hull
+	var lower = [];
+	for (var i = 0; i < coords.length; i++) {
+		while (lower.length >= 2 && self.crossProduct(lower[lower.length - 2], lower[lower.length - 1], coords[i]) <= 0) {
+			lower.pop();
+		}
+		lower.push(coords[i]);
+	}
+
+	//process the upper hull
+	var upper = [];
+	for (var i = coords.length - 1; i >= 0; i--) {
+		while (upper.length >= 2 && self.crossProduct(upper[upper.length - 2], upper[upper.length - 1], coords[i]) <= 0) {
+			upper.pop();
+		}
+		upper.push(coords[i]);
+	}
+
+	upper.pop();
+	lower.pop();
+
+	var hull = lower.concat(upper);
+
+	return hull;
+};
+
 /* Outputs a GeoJSON Feature Polygon that is the convex hull of an array of GeoJSON Point Features.
  * @param points {GeoJSON FeatureCollection} An feature collection of GeoJSON Point Features.
  * @return {GeoJSON Feature Polygon} A polygon representing the convex hull of the input points.
@@ -20,36 +63,12 @@ Triad.prototype.getConvexHull = function(pointFeatureCollection) {
 		return feature.geometry.coordinates;
 	});
 
-	//sort lexigraphically
-	points.sort(function(a, b) {
-		return a[0] == b[0] ? a[1] - b[1] : a[0] - b[0];
-	});
+	var hull = self.convexHull(points);
 
-	//process the lower hull
-	var lower = [];
-	for (var i = 0; i < points.length; i++) {
-		while (lower.length >= 2 && self.crossProduct(lower[lower.length - 2], lower[lower.length - 1], points[i]) <= 0) {
-			lower.pop();
-		}
-		lower.push(points[i]);
-	}
+	//wrap around to meet GeoJSON polygon specification
+	hull.push(hull[0]);
 
-	//process the upper hull
-	var upper = [];
-	for (var i = points.length - 1; i >= 0; i--) {
-		while (upper.length >= 2 && self.crossProduct(upper[upper.length - 2], upper[upper.length - 1], points[i]) <= 0) {
-			upper.pop();
-		}
-		upper.push(points[i]);
-	}
-
-	upper.pop();
-	lower.pop();
-
-	var coords = lower.concat(upper);
-	coords.push(coords[0]);
-	var json = JSON.stringify({ type: "Feature", geometry: {type:"Polygon", coordinates: [[coords]]}, properties: {}});
-	return JSON.parse(json);
+	return { type: "Feature", geometry: { type:"Polygon", coordinates: [[hull]]}, properties: {} };
 
 };
 
@@ -255,10 +274,10 @@ Triad.prototype.getLineString  = function(pointFeatureCollection) {
 /*
  * Returns the cross product of three points, used to determine if r 
  * is to the left or the right of the line through p and q
- * @param p {GeoJSON Point Feature}
- * @param q {GeoJSON Point Feature}
- * @param r {GeoJSON Point Feature}
- * @return {Number} < zero if left, 0 if on the line, > 0 if to the right
+ * @param p {Array}
+ * @param q {Array}
+ * @param r {Array}
+ * @return {Number} < 0 if left, 0 if on the line, > 0 if to the right
 */
 Triad.prototype.crossProduct = function(p, q, r) {
 	return (q[0] - p[0]) * 
@@ -340,7 +359,12 @@ Triad.prototype.getPositions = function(geoJson) {
 Triad.prototype.clipLineStringToPolygon = function(gjsLine, gjsPoly) {
 
 	var self = this;
-	var insideRing = false;
+
+	//tracking data structure of coord objects {coord, inside}
+	var processedCoords = [];
+
+	//holds the clipped coords we will stuff into a LineString GeoJSON object
+	var clippedCoords = [];
 
 	var result = self.cloneObject(gjsLine);
 
@@ -359,91 +383,71 @@ Triad.prototype.clipLineStringToPolygon = function(gjsLine, gjsPoly) {
 		line = [line];
 	}
 
-	var priorityQueue = [];
-
-	var searchTree = { value: null, left: null, right: null };
-
-
 	//for each individual linestring
 	for (var i = 0; i < line.length; i++) {
-		var intersectingLineSegmentStart = -1;
-		var intersectingLineSegmentEnd = -1;
 
 		//for each linestring position (vertex)
 		for (var j = 0; j < line[i].length; j++) {
-
-			if (j < line[i].length - 1) {
-
-				var lineStartCoord = line[i][j];
-				var lineEndCoord = line[i][j+1];
-
-				var line1StartX = lineStartCoord[0];
-				var line1StartY = lineStartCoord[1];
-
-				var line1EndX = lineEndCoord[0];
-				var line1EndY = lineEndCoord[1];
-
-				var polys = gjsPoly.geometry.coordinates;
-
-				if (gjsPoly.type === "Polygon") {
-					polys = [polys];
-				}
-
-				//for each individual polygon
-				for (var k = 0; k < polys.length; k++) {
-
-					//for each linear ring in the polygon
-					for (var m = 0; m < polys[k].length; m++) {
-						//for each positional coordinate in the linear ring
-						for (p = 0; p < polys[k][m].length; p++) {
-							if (p < polys[k][m].length - 1) {
-								
-								var linRingSegStartCoord = polys[k][m][p];
-								var linRingSegEndCoord = polys[k][m][p+1];
-
-								var line2StartX = linRingSegStartCoord[0];
-								var line2StartY = linRingSegStartCoord[1];
-
-								var line2EndX = linRingSegEndCoord[0];
-								var line2EndY = linRingSegEndCoord[1];
-
-								var denom = ((line2EndY - line2StartY) * 
-									(line1EndX - line1StartX)) - 
-									((line2EndX - line2StartX) * 
-									(line1EndY - line1StartY));
-
-								if (denom === 0) {
-									//the line segment and the polygon edge segment are parrallel.
-									continue;
-								} else {
-									
-									var a = line1StartY - line2StartY;
-									var b = line1StartX - line2StartX;
-								    var numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
-    								var numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
-    								a = numerator1 / denom;
-    								b = numerator2 / denom;
-
-    								//an infinite line along the line segment and an infinite line
-    								//along the polygon segment will intersect here.
-    								var x = line1StartX + (a * (line1EndX - line1StartX));
-    								var y = line1StartY + (a * (line1EndY - line1StartY));
-
-    								if (a > 0 && a < 1 && b > 0 && b < 1) {
-    									//(x, y) falls on the line segment and the polygon edge segment
-
-    									//index of this position along the line
-    									intersectingLineSegmentStart = j;
-    									
-    								}
-
-								}
-
-							}
-						}
-					}				
+			var startVertex = line[i][j];
+			var endVertex = line[i][j+1];
+			var linearRings = gjsPoly.geometry.coordinates;
+			for (var k = 0; k < linearRings.length; k++) {
+				//does this vertex lie within the linear ring?
+				if (self.inRing(startVertex, linearRings[k])) {
+					if (k === 0) {
+						//it's not in a hole
+						processedCoords.push({ 
+							coord: [startVertex[0], startVertex[1]],
+							inside: true
+						});
+					} else {
+						//it's in a hole
+						processedCoords.push({ 
+							coord: [startVertex[0], startVertex[1]],
+							inside: false
+						});
+					}
+				} else {
+					//it's outside the poly altogether
+					processedCoords.push({ 
+						coord: [startVertex[0], startVertex[1]],
+						inside: false
+					});
 				}
 			}
+		}
+	}
+
+	//Now loop though the processedCoords. If one has inside = true and the other false,
+	//then that line segment intersects a polygon edge. Get the point of
+	//intersection and deal with it and keep track of holes and lines that weave in and out of the poly!
+	var inHole = true;
+	for (var i = 0; i < processedCoords.length; i++) {
+		if (i < processedCoords.length - 1) {
+			//if this vertex is inside or the next one is inside...
+			if (processedCoords[i].inside || processedCoords[i + 1].inside) {
+				
+				//if both are not inside...
+				if (!processedCoords[i].inside && processedCoords[i+1].inside) {
+					
+					//get the point of intersection
+					var coord = getIntersectionPointOfLineToPoly([processedCoords[i].coord, processedCoords[i+1].coord], gjsPoly);
+					
+					//if the startvertex is inside and we are at the beginning of the linestring, add it.
+					if (processedCoords[i].inside) {
+						//push the intersection vertex
+						clippedCoords.push(processedCoords[i]);
+						clippedCoords.push(coord);
+					} else {
+						clippedCoords.push(coord);
+					}
+				} else {
+					//both of these points are inside the poly. add them
+					clippedCoords.push(processedCoords[i].coord);
+				}
+			} 
+		} else {
+			//...
 		}
 	}
 };
