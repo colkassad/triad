@@ -1,12 +1,30 @@
 {
   "name": "triad",
-  "version": "0.1.0",
+  "version": "0.0.2",
+  "description": "Node module that performs geoprocesisng on GeoJSON features.",
+  "main": "./lib/triad.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/colkassad/triad.git"
+  },
+  "keywords": [
+    "gis"
+  ],
+  "author": "Shane Brennan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/colkassad/triad/issues"
+  },
+  "homepage": "https://github.com/colkassad/triad#readme",
   "devDependencies": {
-    "grunt": "^0.4.5",
-    "grunt-contrib-copy": "^0.8.0",
-    "grunt-contrib-jshint": "^0.11.0",
-    "grunt-contrib-nodeunit": "^0.4.1",
-    "grunt-contrib-uglify": "^0.8.0",
-    "qunitjs": "^1.17.1"
+    "chai": "^4.2.0",
+    "mocha": "^6.1.4"
   }
 }
