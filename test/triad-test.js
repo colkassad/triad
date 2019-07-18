@@ -140,7 +140,6 @@ describe("Ensure that clipping produces GeoJSON geometry", function() {
         done();
     });
 
-    /*
     it("Clip LineString in Polygon", function(done) {
         var line = {type: "Feature", geometry: {type: "LineString", coordinates: [[-1, 5], [11, 5]]}, properties: {}};
 	    var poly = {type:"Feature", geometry: {type: "Polygon", coordinates: [[[0,0], [0, 10], [10,10], [10,0], [0,0]]]}, properties: {}};
@@ -155,5 +154,4 @@ describe("Ensure that clipping produces GeoJSON geometry", function() {
         chai.expect(startX === 0 && startY === 5 && endX === 10 && endY === 5).to.equal(true);
         done();
     });
-    */
 });
